@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import axios from "axios";
+import api from "../api";
 import { FiSearch, FiBookOpen, FiExternalLink } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -13,7 +13,7 @@ const Explore = () => {
     useEffect(() => {
         const fetchSkills = async () => {
             try {
-                const response = await axios.get("http://localhost:5000/api/skill-maps");
+                const response = await api.get("/api/skill-maps");
                 setSkills(response.data);
             } catch (error) {
                 console.error("Error fetching skills", error);
@@ -26,14 +26,14 @@ const Explore = () => {
 
     // Extract unique categories from skills
     const categories = ["All", ...new Set(
-        skills.flatMap(skill => 
+        skills.flatMap(skill =>
             skill.learningPath?.map(topic => topic.topic) || []
         )
     )].filter(Boolean);
 
     const filteredSkills = skills.filter(skill => {
         const matchesSearch = skill.skillName.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesCategory = selectedCategory === "All" || 
+        const matchesCategory = selectedCategory === "All" ||
             skill.learningPath?.some(topic => topic.topic === selectedCategory);
         return matchesSearch && matchesCategory;
     });
@@ -43,7 +43,7 @@ const Explore = () => {
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="mb-8 text-center">
-                    <motion.h2 
+                    <motion.h2
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="text-3xl font-bold text-gray-800 mb-2"
@@ -56,7 +56,7 @@ const Explore = () => {
                 </div>
 
                 {/* Search and Filter */}
-                <motion.div 
+                <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.1 }}
@@ -75,7 +75,7 @@ const Explore = () => {
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
-                        
+
                         <select
                             value={selectedCategory}
                             onChange={(e) => setSelectedCategory(e.target.value)}
@@ -119,7 +119,7 @@ const Explore = () => {
                                                         {skill.skillName}
                                                     </h3>
                                                 </div>
-                                                
+
                                                 {skill.learningPath?.length > 0 && (
                                                     <div className="mb-4">
                                                         <h4 className="text-xs font-medium text-gray-500 uppercase mb-1">
@@ -127,8 +127,8 @@ const Explore = () => {
                                                         </h4>
                                                         <div className="flex flex-wrap gap-1">
                                                             {skill.learningPath.slice(0, 3).map((topic, index) => (
-                                                                <span 
-                                                                    key={index} 
+                                                                <span
+                                                                    key={index}
                                                                     className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full"
                                                                 >
                                                                     {topic.topic}

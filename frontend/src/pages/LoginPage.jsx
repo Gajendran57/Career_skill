@@ -1,18 +1,17 @@
 import { useState } from "react";
-import axios from "axios";
-import { useNavigate, Link } from "react-router-dom";
+import api from "../api";
+import { Link } from "react-router-dom";
 import { FiLogIn, FiMail, FiLock, FiUserPlus, FiEye, FiEyeOff } from "react-icons/fi";
 import { motion } from "framer-motion";
 
 const Login = () => {
-  const [formData, setFormData] = useState({ 
-    email: "", 
-    password: "" 
+  const [formData, setFormData] = useState({
+    email: "",
+    password: ""
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -24,15 +23,18 @@ const Login = () => {
     setError("");
 
     try {
-      const res = await axios.post("http://localhost:5000/api/auth/login", formData);
-      
+      const res = await api.post("/api/auth/login", formData);
+
       const userData = res.data;
       localStorage.setItem("user", JSON.stringify(userData));
-      
+
+      // Force a full page reload so App.jsx remounts and re-reads localStorage.
+      // Without this, App's `user` state stays null and the /dashboard route
+      // never registers → wildcard redirects back to /login.
       if (userData?.email === "admin@gmail.com" && formData.password === "Admin@123") {
-        navigate("/admin");
+        window.location.href = "/admin";
       } else {
-        navigate("/");
+        window.location.href = "/dashboard";
       }
     } catch (err) {
       setError(err.response?.data?.message || "Login failed. Please check your credentials.");
@@ -43,7 +45,7 @@ const Login = () => {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
@@ -57,7 +59,7 @@ const Login = () => {
 
         {/* Error Message */}
         {error && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 text-red-700 dark:text-red-200 p-4 mx-6 mt-6 rounded"
@@ -152,8 +154,8 @@ const Login = () => {
         <div className="px-6 pb-6 text-center">
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Don't have an account?{" "}
-            <Link 
-              to="/register" 
+            <Link
+              to="/register"
               className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center justify-center gap-1"
             >
               <FiUserPlus size={14} />

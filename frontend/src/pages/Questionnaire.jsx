@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../api";
 import { FiSun, FiMoon, FiArrowRight } from "react-icons/fi";
 import { motion } from "framer-motion";
 
@@ -63,16 +63,19 @@ const QuestionnairePage = ({ onComplete }) => {
         e.preventDefault();
         if (!validateForm()) return;
         setIsSubmitting(true);
-      
+
         const user = JSON.parse(localStorage.getItem("user"));
         const userId = user ? user.userId : null;
-      
+
         try {
-            const response = await axios.post("http://127.0.0.1:5000/predict", formData);
-      
+            // Call the backend, which proxies to the Flask ML service.
+            // The backend's mlController strips Age and forwards only the
+            // 7 fields the ML model expects.
+            const response = await api.post("/api/ml/predict", formData);
+
             if (response.data.skill) {
                 setPrediction(response.data.skill);
-                await axios.post("http://localhost:5000/api/save-prediction", {
+                await api.post("/api/save-prediction", {
                     userId,
                     skill: response.data.skill,
                 });
@@ -88,9 +91,9 @@ const QuestionnairePage = ({ onComplete }) => {
         }
     };
 
-const handleFinalize = async () => {
+    const handleFinalize = async () => {
         navigate("/dashboard");
-};
+    };
 
     return (
         <div className={`min-h-screen flex items-center justify-center p-4 transition-colors duration-300 ${darkMode ? "bg-gray-900" : "bg-gray-50"}`}>
@@ -103,7 +106,7 @@ const handleFinalize = async () => {
                 {darkMode ? <FiSun size={20} /> : <FiMoon size={20} />}
             </button>
 
-            <motion.div 
+            <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className={`w-full max-w-md rounded-xl shadow-lg overflow-hidden transition-colors duration-300 ${darkMode ? "bg-gray-800" : "bg-white"}`}
@@ -272,7 +275,7 @@ const handleFinalize = async () => {
 
                     {/* Prediction Result */}
                     {prediction && (
-                        <motion.div 
+                        <motion.div
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             className={`p-4 rounded-lg ${darkMode ? "bg-green-900/30 border border-green-800" : "bg-green-100 border border-green-200"}`}

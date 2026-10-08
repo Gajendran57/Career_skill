@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import { API_BASE } from "../api";
 import { FiChevronDown, FiChevronUp, FiExternalLink, FiBookOpen, FiYoutube, FiBookmark } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -16,14 +17,14 @@ const SkillDetail = () => {
       setLoading(false);
       return;
     }
-    
+
     const fetchSkillDetails = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/skill-maps/${id}`);
+        const res = await fetch(`${API_BASE}/api/skill-maps/${id}`);
         if (!res.ok) throw new Error(`Failed to fetch: ${res.statusText}`);
         const data = await res.json();
         setSkill(data);
-        
+
         // Expand first topic by default
         if (data?.learningPath?.length > 0) {
           setExpandedTopics({ 0: true });
@@ -60,8 +61,8 @@ const SkillDetail = () => {
         <div className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 p-4 rounded-lg max-w-md">
           <h2 className="text-xl font-bold mb-2">Error Loading Skill</h2>
           <p className="mb-4">{error}</p>
-          <Link 
-            to="/explore" 
+          <Link
+            to="/explore"
             className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
           >
             Back to Explore
@@ -77,8 +78,8 @@ const SkillDetail = () => {
         <div className="bg-gray-100 dark:bg-gray-800 p-6 rounded-lg max-w-md">
           <h2 className="text-xl font-bold mb-2">Skill Not Found</h2>
           <p className="mb-4">The requested skill could not be found.</p>
-          <Link 
-            to="/explore" 
+          <Link
+            to="/explore"
             className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
           >
             Explore Skills
@@ -92,7 +93,7 @@ const SkillDetail = () => {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-8 text-center"
@@ -106,7 +107,7 @@ const SkillDetail = () => {
         </motion.div>
 
         {/* Learning Path */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}
@@ -116,15 +117,15 @@ const SkillDetail = () => {
             <FiBookOpen className="text-blue-600" />
             Learning Path
           </h2>
-          
+
           <div className="space-y-3">
             {skill.learningPath?.map((topic, index) => (
               <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                 <button
                   onClick={() => toggleTopic(index)}
                   className={`w-full flex justify-between items-center p-4 text-left ${
-                    expandedTopics[index] 
-                      ? "bg-blue-50 dark:bg-blue-900/20" 
+                    expandedTopics[index]
+                      ? "bg-blue-50 dark:bg-blue-900/20"
                       : "hover:bg-gray-50 dark:hover:bg-gray-800"
                   } transition-colors`}
                 >
@@ -149,8 +150,8 @@ const SkillDetail = () => {
                     >
                       <div className="p-4 pt-0 space-y-4">
                         {topic.subtopics?.map((sub, subIndex) => (
-                          <div 
-                            key={subIndex} 
+                          <div
+                            key={subIndex}
                             className="pl-4 border-l-2 border-blue-500"
                           >
                             <h4 className="font-medium text-gray-800 dark:text-gray-200 mb-2">
@@ -185,7 +186,7 @@ const SkillDetail = () => {
         </motion.div>
 
         {/* Additional Resources */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}

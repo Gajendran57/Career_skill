@@ -1,15 +1,15 @@
 import { useState } from "react";
-import axios from "axios";
+import api from "../api";
 import { useNavigate, Link } from "react-router-dom";
 import { FiUser, FiMail, FiLock, FiArrowRight } from "react-icons/fi";
 import { motion } from "framer-motion";
 
 const Register = () => {
-  const [formData, setFormData] = useState({ 
-    name: "", 
-    email: "", 
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
     password: "",
-    confirmPassword: "" 
+    confirmPassword: ""
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -23,7 +23,7 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Basic validation
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords don't match");
@@ -34,17 +34,17 @@ const Register = () => {
     setError("");
 
     try {
-      await axios.post("http://localhost:5000/api/auth/register", {
+      await api.post("/api/auth/register", {
         name: formData.name,
         email: formData.email,
         password: formData.password
       });
-      
-      navigate("/login", { 
-        state: { 
+
+      navigate("/login", {
+        state: {
           registrationSuccess: true,
-          email: formData.email 
-        } 
+          email: formData.email
+        }
       });
     } catch (err) {
       setError(err.response?.data?.message || "Registration failed. Please try again.");
@@ -55,7 +55,7 @@ const Register = () => {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
@@ -69,7 +69,7 @@ const Register = () => {
 
         {/* Error Message */}
         {error && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 text-red-700 dark:text-red-200 p-4 mx-6 mt-6 rounded"
@@ -219,8 +219,8 @@ const Register = () => {
         <div className="px-6 pb-6 text-center">
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Already have an account?{" "}
-            <Link 
-              to="/login" 
+            <Link
+              to="/login"
               className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
             >
               Sign in now

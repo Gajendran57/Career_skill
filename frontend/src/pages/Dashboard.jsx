@@ -8,7 +8,7 @@ import { FaCode, FaShieldAlt, FaServer } from "react-icons/fa";
 import { SiBlockchaindotcom } from "react-icons/si";
 import { HiLightBulb, HiBookOpen } from "react-icons/hi";
 import { RiRoadMapLine } from "react-icons/ri";
-import axios from "axios";
+import api, { API_BASE } from "../api";
 import { motion } from "framer-motion";
 
 const Dashboard = () => {
@@ -32,64 +32,62 @@ const Dashboard = () => {
     { name: "Cloud Computing", icon: <FaServer className="text-red-500" /> }
   ];
 
-useEffect(() => {
-  const initDashboard = async () => {
-    const storedUser = JSON.parse(localStorage.getItem("user"));
-    console.log("Stored user:", storedUser);
+  useEffect(() => {
+    const initDashboard = async () => {
+      const storedUser = JSON.parse(localStorage.getItem("user"));
+      console.log("Stored user:", storedUser);
 
-    if (!storedUser) {
-      navigate("/login");
-      return;
-    }
-
-    setUser(storedUser);
-    setPredictedSkills([]);
-    setSelectedTopic(null);
-    setFilteredSkills([]);
-    setDisplayedSkill(null);
-
-    try {
-      const skillsResponse = await fetch("http://localhost:5000/api/skill-maps");
-      const allSkillsData = await skillsResponse.json();
-      setAllSkills(allSkillsData);
-
-      const predictedRes = await fetch(`http://localhost:5000/api/predicted-skill?userId=${storedUser.userId}`);
-      const predictedData = await predictedRes.json();
-
-      if (predictedRes.ok && predictedData.skill) {
-        const predictedSkillNames = Array.isArray(predictedData.skill)
-          ? predictedData.skill
-          : [predictedData.skill];
-
-        const matchedSkills = allSkillsData.filter(skill =>
-          predictedSkillNames.some(pred => pred.toLowerCase() === skill.skillName.toLowerCase())
-        );
-
-        setPredictedSkills(matchedSkills);
-        console.log("Matched predicted skills:", matchedSkills);
-        setActiveTab("predicted");
-      } else {
-        console.log(predictedData.error || "No predicted skill found for this user.");
+      if (!storedUser) {
+        navigate("/login");
+        return;
       }
-    } catch (error) {
-      console.error("Error initializing dashboard:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  initDashboard();
+      setUser(storedUser);
+      setPredictedSkills([]);
+      setSelectedTopic(null);
+      setFilteredSkills([]);
+      setDisplayedSkill(null);
 
-}, [navigate]);
+      try {
+        const skillsResponse = await fetch(`${API_BASE}/api/skill-maps`);
+        const allSkillsData = await skillsResponse.json();
+        setAllSkills(allSkillsData);
 
-useEffect(() => { 
-  fetchAllSkills();
-}, []);
+        const predictedRes = await fetch(`${API_BASE}/api/predicted-skill?userId=${storedUser.userId}`);
+        const predictedData = await predictedRes.json();
 
+        if (predictedRes.ok && predictedData.skill) {
+          const predictedSkillNames = Array.isArray(predictedData.skill)
+            ? predictedData.skill
+            : [predictedData.skill];
 
+          const matchedSkills = allSkillsData.filter(skill =>
+            predictedSkillNames.some(pred => pred.toLowerCase() === skill.skillName.toLowerCase())
+          );
+
+          setPredictedSkills(matchedSkills);
+          console.log("Matched predicted skills:", matchedSkills);
+          setActiveTab("predicted");
+        } else {
+          console.log(predictedData.error || "No predicted skill found for this user.");
+        }
+      } catch (error) {
+        console.error("Error initializing dashboard:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initDashboard();
+
+  }, [navigate]);
+
+  useEffect(() => {
+    fetchAllSkills();
+  }, []);
 
   const fetchAllSkills = () => {
-    axios.get("http://localhost:5000/api/skill-maps")
+    api.get("/api/skill-maps")
       .then((response) => {
         setAllSkills(response.data);
       })

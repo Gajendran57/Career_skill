@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import axios from "axios";
+import api from "../api";
 import { FiTrash2, FiEdit, FiPlus, FiSearch } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -16,7 +16,7 @@ const AdminSkillListPage = () => {
 
     const fetchSkills = async () => {
         try {
-            const response = await axios.get("http://localhost:5000/api/skill-maps");
+            const response = await api.get("/api/skill-maps");
             setSkills(response.data);
         } catch (error) {
             console.error("Error fetching skills", error);
@@ -31,7 +31,7 @@ const AdminSkillListPage = () => {
 
         setDeleteLoading(id);
         try {
-            await axios.delete(`http://localhost:5000/api/skill-maps/${id}`);
+            await api.delete(`/api/skill-maps/${id}`);
             setSkills(skills.filter(skill => skill._id !== id));
         } catch (error) {
             console.error("Error deleting skill", error);
@@ -53,7 +53,7 @@ const AdminSkillListPage = () => {
                         {skills.length} skill{skills.length !== 1 ? 's' : ''} available
                     </p>
                 </div>
-                
+
                 <div className="flex gap-3">
                     <div className="relative flex-1 md:w-64">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -67,7 +67,7 @@ const AdminSkillListPage = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    
+
                     <Link
                         to="/admin/skill-map/new"
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
@@ -103,8 +103,8 @@ const AdminSkillListPage = () => {
                                             </h3>
                                             <div className="flex flex-wrap gap-1 mb-3">
                                                 {skill.learningPath?.slice(0, 3).map((topic, idx) => (
-                                                    <span 
-                                                        key={idx} 
+                                                    <span
+                                                        key={idx}
                                                         className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
                                                     >
                                                         {topic.topic}
@@ -118,7 +118,7 @@ const AdminSkillListPage = () => {
                                             </div>
                                         </div>
                                     </Link>
-                                    
+
                                     <motion.button
                                         whileHover={{ scale: 1.1 }}
                                         whileTap={{ scale: 0.9 }}

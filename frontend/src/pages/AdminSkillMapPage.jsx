@@ -1,5 +1,5 @@
 import { useState } from "react";
-import axios from "axios";
+import api from "../api";
 import { FiPlus, FiTrash2, FiLink, FiBookOpen, FiSave } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -61,7 +61,7 @@ const AdminSkillMapPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     const payload = {
       skillName,
       learningPath: topics.map((t, index) => ({
@@ -72,7 +72,7 @@ const AdminSkillMapPage = () => {
     };
 
     try {
-      await axios.post("http://localhost:5000/api/skill-maps", payload);
+      await api.post("/api/skill-maps", payload);
       setMessage({ text: "Skill Map created successfully!", type: "success" });
       setSkillName("");
       setTopics([{ topic: "", subtopics: [{ name: "", resources: [""] }] }]);
