@@ -60,36 +60,38 @@ const QuestionnairePage = ({ onComplete }) => {
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!validateForm()) return;
-        setIsSubmitting(true);
+    e.preventDefault();
+    if (!validateForm()) return;
+    setIsSubmitting(true);
 
-        const user = JSON.parse(localStorage.getItem("user"));
-        const userId = user ? user.userId : null;
+    const user = JSON.parse(localStorage.getItem("user"));
+    const userId = user ? user.userId : null;
 
-        try {
-            // Call the backend, which proxies to the Flask ML service.
-            // The backend's mlController strips Age and forwards only the
-            // 7 fields the ML model expects.
-            const response = await api.post("/api/ml/predict", formData);
+    try {
+        // Call the backend, which proxies to the Flask ML service.
+        const response = await api.post("/api/ml/predict", formData);
 
-            if (response.data.skill) {
-                setPrediction(response.data.skill);
-                await api.post("/api/save-prediction", {
-                    userId,
-                    skill: response.data.skill,
-                });
-            } else {
-                console.error("No skill returned from API", response.data);
-                setPrediction("No skill prediction available");
-            }
-        } catch (error) {
-            console.error("Prediction failed:", error);
-            setPrediction("Error: Could not get prediction");
-        } finally {
-            setIsSubmitting(false);
+        if (response.data.skill) {
+            setPrediction(response.data.skill);
+            await api.post("/api/save-prediction", {
+                userId,
+                skill: response.data.skill,
+            });
+        } else {
+            console.error("No skill returned from API", response.data);
+            setPrediction("No skill prediction available");
         }
-    };
+    } catch (error) {
+        console.error("Prediction failed:", error);
+        const detail =
+            error.response?.data?.error ||   // backend sent a message (400/500/503)
+            error.message ||                 // network-level error
+            "Unknown error";
+        setPrediction(`Error: ${detail}`);
+    } finally {
+        setIsSubmitting(false);
+    }
+};
 
     const handleFinalize = async () => {
         navigate("/dashboard");
