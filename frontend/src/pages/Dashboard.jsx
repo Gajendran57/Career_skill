@@ -11,6 +11,16 @@ import { RiRoadMapLine } from "react-icons/ri";
 import api, { API_BASE } from "../api";
 import { motion } from "framer-motion";
 
+// Split a string like "Intermediate AI/ML, TensorFlow" into keywords
+// ["intermediate", "ai", "ml", "tensorflow"] for fuzzy matching against
+// skill-map names.
+const extractKeywords = (text) =>
+  String(text)
+    .toLowerCase()
+    .split(/[\s,/]+/)
+    .map((w) => w.trim())
+    .filter((w) => w.length > 2);
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -21,6 +31,7 @@ const Dashboard = () => {
   const [filteredSkills, setFilteredSkills] = useState([]);
   const [displayedSkill, setDisplayedSkill] = useState(null);
   const [predictedSkills, setPredictedSkills] = useState([]);
+  const [rawPrediction, setRawPrediction] = useState("");
   const [activeTab, setActiveTab] = useState("home");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -32,10 +43,19 @@ const Dashboard = () => {
     { name: "Cloud Computing", icon: <FaServer className="text-red-500" /> }
   ];
 
+  // Helper: given a prediction string, match it against skill maps.
+  const buildMatchedSkills = (predictionText, skillsList) => {
+    if (!predictionText || !skillsList.length) return [];
+    const predictionKeywords = extractKeywords(predictionText);
+    return skillsList.filter((skill) => {
+      const skillKeywords = extractKeywords(skill.skillName);
+      return skillKeywords.some((k) => predictionKeywords.includes(k));
+    });
+  };
+
   useEffect(() => {
     const initDashboard = async () => {
       const storedUser = JSON.parse(localStorage.getItem("user"));
-      console.log("Stored user:", storedUser);
 
       if (!storedUser) {
         navigate("/login");
@@ -43,33 +63,46 @@ const Dashboard = () => {
       }
 
       setUser(storedUser);
-      setPredictedSkills([]);
-      setSelectedTopic(null);
-      setFilteredSkills([]);
-      setDisplayedSkill(null);
+
+      // 1️⃣ Read prediction from localStorage FIRST — this is what makes the
+      //    tab appear instantly, even before the network round-trips finish.
+      const storedPrediction = localStorage.getItem("predictedSkill") || "";
+      if (storedPrediction) {
+        setRawPrediction(storedPrediction);
+        setActiveTab("predicted");
+      }
 
       try {
+        // 2️⃣ Fetch all skill maps (needed for matching).
         const skillsResponse = await fetch(`${API_BASE}/api/skill-maps`);
         const allSkillsData = await skillsResponse.json();
         setAllSkills(allSkillsData);
 
-        const predictedRes = await fetch(`${API_BASE}/api/predicted-skill?userId=${storedUser.userId}`);
-        const predictedData = await predictedRes.json();
-
-        if (predictedRes.ok && predictedData.skill) {
-          const predictedSkillNames = Array.isArray(predictedData.skill)
-            ? predictedData.skill
-            : [predictedData.skill];
-
-          const matchedSkills = allSkillsData.filter(skill =>
-            predictedSkillNames.some(pred => pred.toLowerCase() === skill.skillName.toLowerCase())
+        // 3️⃣ Try to fetch the persisted prediction from the backend.
+        let finalPrediction = storedPrediction;
+        try {
+          const predictedRes = await fetch(
+            `${API_BASE}/api/predicted-skill?userId=${storedUser.userId}`
           );
+          if (predictedRes.ok) {
+            const predictedData = await predictedRes.json();
+            if (predictedData.skill) {
+              finalPrediction = Array.isArray(predictedData.skill)
+                ? predictedData.skill.join(", ")
+                : predictedData.skill;
+              // Keep localStorage in sync with what the backend has.
+              localStorage.setItem("predictedSkill", finalPrediction);
+            }
+          }
+        } catch (err) {
+          console.warn("Backend predicted-skill fetch failed, using local value:", err.message);
+        }
 
-          setPredictedSkills(matchedSkills);
-          console.log("Matched predicted skills:", matchedSkills);
+        // 4️⃣ Commit final prediction + matched skills to state.
+        if (finalPrediction) {
+          setRawPrediction(finalPrediction);
+          setPredictedSkills(buildMatchedSkills(finalPrediction, allSkillsData));
           setActiveTab("predicted");
-        } else {
-          console.log(predictedData.error || "No predicted skill found for this user.");
         }
       } catch (error) {
         console.error("Error initializing dashboard:", error);
@@ -79,25 +112,12 @@ const Dashboard = () => {
     };
 
     initDashboard();
-
   }, [navigate]);
-
-  useEffect(() => {
-    fetchAllSkills();
-  }, []);
-
-  const fetchAllSkills = () => {
-    api.get("/api/skill-maps")
-      .then((response) => {
-        setAllSkills(response.data);
-      })
-      .catch((error) => console.error("Error fetching all skills", error))
-      .finally(() => setLoading(false));
-  };
 
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
+    localStorage.removeItem("predictedSkill");
     localStorage.removeItem("predictedSkillFull");
     navigate("/login");
   };
@@ -116,12 +136,29 @@ const Dashboard = () => {
     let filtered = [];
     const t = topic.toLowerCase();
 
-    filtered = allSkills.filter(skill =>
-      (t === "ai/ml" && (skill.skillName.toLowerCase().includes("ai") || skill.skillName.toLowerCase().includes("ml") || skill.skillName.toLowerCase().includes("machine learning"))) ||
-      (t === "web development" && (skill.skillName.toLowerCase().includes("web") || skill.skillName.toLowerCase().includes("frontend") || skill.skillName.toLowerCase().includes("backend"))) ||
-      (t === "cybersecurity" && (skill.skillName.toLowerCase().includes("security") || skill.skillName.toLowerCase().includes("cyber") || skill.skillName.toLowerCase().includes("cryptography"))) ||
-      (t === "blockchain" && (skill.skillName.toLowerCase().includes("blockchain") || skill.skillName.toLowerCase().includes("defi"))) ||
-      (t === "cloud computing" && (skill.skillName.toLowerCase().includes("cloud") || skill.skillName.toLowerCase().includes("aws") || skill.skillName.toLowerCase().includes("azure") || skill.skillName.toLowerCase().includes("gcp")))
+    filtered = allSkills.filter(
+      (skill) =>
+        (t === "ai/ml" &&
+          (skill.skillName.toLowerCase().includes("ai") ||
+            skill.skillName.toLowerCase().includes("ml") ||
+            skill.skillName.toLowerCase().includes("machine learning") ||
+            skill.skillName.toLowerCase().includes("tensorflow"))) ||
+        (t === "web development" &&
+          (skill.skillName.toLowerCase().includes("web") ||
+            skill.skillName.toLowerCase().includes("frontend") ||
+            skill.skillName.toLowerCase().includes("backend"))) ||
+        (t === "cybersecurity" &&
+          (skill.skillName.toLowerCase().includes("security") ||
+            skill.skillName.toLowerCase().includes("cyber") ||
+            skill.skillName.toLowerCase().includes("cryptography"))) ||
+        (t === "blockchain" &&
+          (skill.skillName.toLowerCase().includes("blockchain") ||
+            skill.skillName.toLowerCase().includes("defi"))) ||
+        (t === "cloud computing" &&
+          (skill.skillName.toLowerCase().includes("cloud") ||
+            skill.skillName.toLowerCase().includes("aws") ||
+            skill.skillName.toLowerCase().includes("azure") ||
+            skill.skillName.toLowerCase().includes("gcp")))
     );
 
     const shuffled = [...filtered].sort(() => 0.5 - Math.random());
@@ -160,7 +197,8 @@ const Dashboard = () => {
                 <span>Home</span>
               </button>
 
-              {predictedSkills.length > 0 && (
+              {/* Predicted tab — only rendered when a prediction exists */}
+              {rawPrediction && (
                 <button
                   onClick={() => handleTabChange("predicted")}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
@@ -243,7 +281,7 @@ const Dashboard = () => {
                 <span>Home</span>
               </button>
 
-              {predictedSkills.length > 0 && (
+              {rawPrediction && (
                 <button
                   onClick={() => handleTabChange("predicted")}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg ${
@@ -312,7 +350,9 @@ const Dashboard = () => {
                 transition={{ duration: 0.5 }}
                 className="text-center mb-12"
               >
-                <h2 className="text-3xl font-bold mb-2">Welcome back, {user.name.split(' ')[0]}!</h2>
+                <h2 className="text-3xl font-bold mb-2">
+                  Welcome back, {user.name?.split(" ")[0] || "there"}!
+                </h2>
                 <p className="text-gray-600 dark:text-gray-400">
                   {activeTab === "predicted"
                     ? "Your personalized skill recommendations"
@@ -323,7 +363,6 @@ const Dashboard = () => {
 
             {activeTab === "home" && (
               <>
-                {/* Topic Selection */}
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -351,7 +390,7 @@ const Dashboard = () => {
                       animate={{ opacity: 1 }}
                       className="text-2xl font-bold mb-8 text-center flex items-center justify-center gap-3"
                     >
-                      {topics.find(t => t.name === selectedTopic)?.icon}
+                      {topics.find((t) => t.name === selectedTopic)?.icon}
                       {selectedTopic} Skills
                     </motion.h3>
 
@@ -418,7 +457,7 @@ const Dashboard = () => {
                                             <div>
                                               <span className="font-medium">Resource {linkIdx + 1}</span>
                                               <span className="block text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                                {new URL(link).hostname.replace('www.', '')}
+                                                {new URL(link).hostname.replace("www.", "")}
                                               </span>
                                             </div>
                                           </a>
@@ -448,7 +487,7 @@ const Dashboard = () => {
               </>
             )}
 
-            {activeTab === "predicted" && predictedSkills.length > 0 && (
+            {activeTab === "predicted" && rawPrediction && (
               <motion.div
                 initial={{ opacity: 0, x: 100 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -462,80 +501,100 @@ const Dashboard = () => {
                       <HiLightBulb className="text-blue-600 dark:text-blue-300 text-2xl" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-lg">Your Personalized Skill Recommendations</h3>
-                      <p className="text-gray-600 dark:text-gray-400 mt-1">
+                      <h3 className="font-bold text-lg">Your Personalized Skill Recommendation</h3>
+                      <p className="text-2xl font-semibold text-blue-700 dark:text-blue-300 mt-2">
+                        {rawPrediction}
+                      </p>
+                      <p className="text-gray-600 dark:text-gray-400 mt-1 text-sm">
                         Based on your questionnaire responses
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {predictedSkills.map((skill) => (
-                  <motion.div
-                    whileHover={{ scale: 1.005 }}
-                    key={skill._id}
-                    className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden border-l-4 border-green-500"
-                  >
-                    <div className="p-6 border-b dark:border-gray-700">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h4 className="text-xl font-semibold text-green-600 dark:text-green-400 mb-1">
-                            {skill.skillName}
-                          </h4>
-                          <p className="text-gray-500 dark:text-gray-400 text-sm">
-                            Recommended learning path
-                          </p>
-                        </div>
-                        <div className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 px-3 py-1 rounded-full text-sm font-medium">
-                          Recommended
+                {predictedSkills.length > 0 ? (
+                  predictedSkills.map((skill) => (
+                    <motion.div
+                      whileHover={{ scale: 1.005 }}
+                      key={skill._id}
+                      className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden border-l-4 border-green-500"
+                    >
+                      <div className="p-6 border-b dark:border-gray-700">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h4 className="text-xl font-semibold text-green-600 dark:text-green-400 mb-1">
+                              {skill.skillName}
+                            </h4>
+                            <p className="text-gray-500 dark:text-gray-400 text-sm">
+                              Recommended learning path
+                            </p>
+                          </div>
+                          <div className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 px-3 py-1 rounded-full text-sm font-medium">
+                            Recommended
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="divide-y dark:divide-gray-700">
-                      {skill.learningPath?.map((topic, idx) => (
-                        <div key={idx} className="p-6">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="bg-green-100 dark:bg-green-900/50 p-2 rounded-lg">
-                              <RiRoadMapLine className="text-green-600 dark:text-green-400 text-xl" />
-                            </div>
-                            <h5 className="text-lg font-semibold">{topic.topic}</h5>
-                          </div>
-
-                          <div className="ml-14 space-y-4">
-                            {topic.subtopics.map((sub, subIdx) => (
-                              <div key={subIdx} className="pb-4 last:pb-0">
-                                <h6 className="font-bold mb-3 text-gray-700 dark:text-gray-300">{sub.name}</h6>
-                                <ul className="space-y-3">
-                                  {sub.resources.map((link, linkIdx) => (
-                                    <li key={linkIdx}>
-                                      <a
-                                        href={link}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                                      >
-                                        <div className="bg-green-100 dark:bg-green-900/50 p-2 rounded-lg">
-                                          <HiBookOpen className="text-green-600 dark:text-green-400" />
-                                        </div>
-                                        <div>
-                                          <span className="font-medium">Resource {linkIdx + 1}</span>
-                                          <span className="block text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                            {new URL(link).hostname.replace('www.', '')}
-                                          </span>
-                                        </div>
-                                      </a>
-                                    </li>
-                                  ))}
-                                </ul>
+                      <div className="divide-y dark:divide-gray-700">
+                        {skill.learningPath?.map((topic, idx) => (
+                          <div key={idx} className="p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                              <div className="bg-green-100 dark:bg-green-900/50 p-2 rounded-lg">
+                                <RiRoadMapLine className="text-green-600 dark:text-green-400 text-xl" />
                               </div>
-                            ))}
+                              <h5 className="text-lg font-semibold">{topic.topic}</h5>
+                            </div>
+
+                            <div className="ml-14 space-y-4">
+                              {topic.subtopics.map((sub, subIdx) => (
+                                <div key={subIdx} className="pb-4 last:pb-0">
+                                  <h6 className="font-bold mb-3 text-gray-700 dark:text-gray-300">{sub.name}</h6>
+                                  <ul className="space-y-3">
+                                    {sub.resources.map((link, linkIdx) => (
+                                      <li key={linkIdx}>
+                                        <a
+                                          href={link}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                                        >
+                                          <div className="bg-green-100 dark:bg-green-900/50 p-2 rounded-lg">
+                                            <HiBookOpen className="text-green-600 dark:text-green-400" />
+                                          </div>
+                                          <div>
+                                            <span className="font-medium">Resource {linkIdx + 1}</span>
+                                            <span className="block text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                              {new URL(link).hostname.replace("www.", "")}
+                                            </span>
+                                          </div>
+                                        </a>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </motion.div>
-                ))}
+                        ))}
+                      </div>
+                    </motion.div>
+                  ))
+                ) : (
+                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-8 text-center border border-gray-200 dark:border-gray-700">
+                    <HiBookOpen className="mx-auto text-4xl text-gray-400 mb-3" />
+                    <h4 className="text-lg font-semibold mb-2">No matching learning path found yet</h4>
+                    <p className="text-gray-500 dark:text-gray-400 mb-4 max-w-md mx-auto">
+                      We predicted <strong>{rawPrediction}</strong> for you, but no skill map in our library matches those keywords yet.
+                    </p>
+                    <Link
+                      to="/explore"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    >
+                      <MdExplore />
+                      Explore Skills
+                    </Link>
+                  </div>
+                )}
               </motion.div>
             )}
           </>

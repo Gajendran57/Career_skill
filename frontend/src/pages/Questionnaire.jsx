@@ -53,48 +53,63 @@ const QuestionnairePage = ({ onComplete }) => {
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData({ ...formData, [name]: value });
-        // Clear error when user starts typing
         if (errors[name]) {
             setErrors({ ...errors, [name]: "" });
         }
     };
 
     const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-    setIsSubmitting(true);
+        e.preventDefault();
+        if (!validateForm()) return;
+        setIsSubmitting(true);
 
-    const user = JSON.parse(localStorage.getItem("user"));
-    const userId = user ? user.userId : null;
+        const user = JSON.parse(localStorage.getItem("user"));
+        const userId = user ? user.userId : null;
 
-    try {
-        // Call the backend, which proxies to the Flask ML service.
-        const response = await api.post("/api/ml/predict", formData);
+        try {
+            const response = await api.post("/api/ml/predict", formData);
 
-        if (response.data.skill) {
-            setPrediction(response.data.skill);
-            await api.post("/api/save-prediction", {
-                userId,
-                skill: response.data.skill,
-            });
-        } else {
-            console.error("No skill returned from API", response.data);
-            setPrediction("No skill prediction available");
+            if (response.data.skill) {
+                const predictedSkill = response.data.skill;
+                setPrediction(predictedSkill);
+
+                // ✅ Save to localStorage FIRST — this is the source of truth for the
+                // Dashboard's "Predicted" tab. Even if the backend save fails (Render
+                // cold start, 502, etc.), the tab will still show the prediction.
+                localStorage.setItem("predictedSkill", predictedSkill);
+
+                // Then try to persist to MongoDB. If this fails, we log it but
+                // don't block the user — the localStorage value will carry the flow.
+                if (userId) {
+                    try {
+                        await api.post("/api/save-prediction", {
+                            userId,
+                            skill: predictedSkill,
+                        });
+                    } catch (saveErr) {
+                        console.warn("Could not persist prediction to DB:", saveErr.message);
+                    }
+                }
+            } else {
+                console.error("No skill returned from API", response.data);
+                setPrediction("No skill prediction available");
+            }
+        } catch (error) {
+            console.error("Prediction failed:", error);
+            const detail =
+                error.response?.data?.error ||
+                error.message ||
+                "Unknown error";
+            setPrediction(`Error: ${detail}`);
+        } finally {
+            setIsSubmitting(false);
         }
-    } catch (error) {
-        console.error("Prediction failed:", error);
-        const detail =
-            error.response?.data?.error ||   // backend sent a message (400/500/503)
-            error.message ||                 // network-level error
-            "Unknown error";
-        setPrediction(`Error: ${detail}`);
-    } finally {
-        setIsSubmitting(false);
-    }
-};
+    };
 
     const handleFinalize = async () => {
-        navigate("/dashboard");
+        // Full page load so Dashboard's useEffect re-runs and reads the
+        // freshly-stored predictedSkill from localStorage.
+        window.location.href = "/dashboard";
     };
 
     return (
@@ -304,20 +319,8 @@ const QuestionnairePage = ({ onComplete }) => {
                                 disabled={isSubmitting}
                                 className={`w-full py-3 px-4 rounded-lg font-medium flex items-center justify-center gap-2 ${isSubmitting ? "bg-green-400 cursor-not-allowed" : "bg-green-500 hover:bg-green-600"} text-white transition-colors`}
                             >
-                                {isSubmitting ? (
-                                    <>
-                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        Processing...
-                                    </>
-                                ) : (
-                                    <>
-                                        <FiArrowRight />
-                                        Continue to Dashboard
-                                    </>
-                                )}
+                                <FiArrowRight />
+                                Continue to Dashboard
                             </motion.button>
                         ) : (
                             <motion.button
