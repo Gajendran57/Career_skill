@@ -1,67 +1,48 @@
-const fs = require("fs");
-const path = require("path");
-const Papa = require("papaparse");
+const axios = require("axios");
 
-let dataset = [];
+// Flask ML service URL (override via env in production)
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://localhost:3000";
 
-// Load the dataset synchronously before starting the server
-const datasetPath = path.join(__dirname, "../data/career_skill_dataset.csv");
-try {
-    const fileData = fs.readFileSync(datasetPath, "utf8");
-    const parsedData = Papa.parse(fileData, { header: true }).data;
-    
-    // Remove empty or invalid rows
-    dataset = parsedData.filter(row => row["Recommended Skill"]);
-    console.log("Dataset loaded successfully:", dataset.length, "records");
-} catch (error) {
-    console.error("Error loading dataset:", error);
-}
+// Must match CATEGORICAL_COLS in ml-model/app.py and train_model.py
+const REQUIRED_FIELDS = [
+  "Education",
+  "Occupation",
+  "Interest",
+  "Experience",
+  "LearningStyle",
+  "TimeCommitment",
+  "PreferredResources",
+];
 
-// Predict Skill Function
-const predictSkill = (req, res) => {
-    try {
-        const { age, education, occupation, interest, experience } = req.body;
-
-        // Filter dataset based on user responses
-        let filteredSkills = dataset.filter(row =>
-            row["Age"] <= age &&
-            row["Education Level"] === education &&
-            row["Occupation"] === occupation &&
-            row["Interest"] === interest &&
-            row["Experience"] === experience
-        );
-
-        // If no exact match is found, find the closest match based on interest
-        if (filteredSkills.length === 0) {
-            filteredSkills = dataset.filter(row => row["Interest"] === interest);
-        }
-
-        // If still no match, return the most common skill in that interest category
-        if (filteredSkills.length === 0) {
-            const mostCommonSkill = dataset
-                .filter(row => row["Interest"])
-                .map(row => row["Recommended Skill"])
-                .reduce((acc, skill) => {
-                    acc[skill] = (acc[skill] || 0) + 1;
-                    return acc;
-                }, {});
-
-            const recommendedSkill = Object.keys(mostCommonSkill).reduce((a, b) =>
-                mostCommonSkill[a] > mostCommonSkill[b] ? a : b
-            );
-
-            return res.json({ skill: recommendedSkill });
-        }
-
-        // Pick the most relevant skill from filtered results
-        const recommendedSkill = filteredSkills[0]["Recommended Skill"];
-        res.json({ skill: recommendedSkill });
-
-    } catch (error) {
-        console.error("Prediction error:", error);
-        res.status(500).json({ error: "Internal Server Error" });
+const predictSkill = async (req, res) => {
+  try {
+    // Basic validation before hitting the ML service
+    const missing = REQUIRED_FIELDS.filter(
+      (f) => req.body[f] === undefined || req.body[f] === null || req.body[f] === ""
+    );
+    if (missing.length > 0) {
+      return res.status(400).json({ error: `Missing fields: ${missing.join(", ")}` });
     }
-};
 
+    // Forward only the expected fields (defensive)
+    const payload = {};
+    for (const f of REQUIRED_FIELDS) payload[f] = req.body[f];
+
+    const response = await axios.post(`${ML_SERVICE_URL}/predict`, payload, {
+      timeout: 10000,
+      headers: { "Content-Type": "application/json" },
+    });
+
+    return res.status(200).json({ skill: response.data.skill });
+  } catch (error) {
+    console.error("❌ Prediction error:", error.message);
+
+    if (error.response) {
+      // Forward the ML service's status + body
+      return res.status(error.response.status).json(error.response.data);
+    }
+    return res.status(503).json({ error: "ML service unavailable" });
+  }
+};
 
 module.exports = { predictSkill };
