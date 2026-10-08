@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AdminSkillMapPage from "./AdminSkillMapPage";
 import AdminSkillMapListPage from "./AdminSkillMapListPage";
 import { FiPlus, FiList, FiHome, FiLogOut } from "react-icons/fi";
@@ -7,6 +8,20 @@ import { motion } from "framer-motion";
 const AdminDashboard = () => {
   const [activePage, setActivePage] = useState("AdminSkillMap");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const navigate = useNavigate();
+
+  const handleBackToHome = () => {
+    // Full reload so App.jsx remounts and renders the dashboard for the admin user.
+    window.location.href = "/dashboard";
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    localStorage.removeItem("predictedSkillFull");
+    // Full reload clears the in-memory user state in App.jsx.
+    window.location.href = "/login";
+  };
 
   const renderPage = () => {
     switch (activePage) {
@@ -116,7 +131,7 @@ const AdminDashboard = () => {
             <ul className="space-y-1">
               <motion.li whileTap={{ scale: 0.95 }}>
                 <button
-                  onClick={() => {}}
+                  onClick={handleBackToHome}
                   className="w-full flex items-center gap-3 p-3 rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
                 >
                   <FiHome className="text-lg" />
@@ -125,7 +140,7 @@ const AdminDashboard = () => {
               </motion.li>
               <motion.li whileTap={{ scale: 0.95 }}>
                 <button
-                  onClick={() => {}}
+                  onClick={handleLogout}
                   className="w-full flex items-center gap-3 p-3 rounded-md text-red-500 hover:bg-red-50 transition-colors"
                 >
                   <FiLogOut className="text-lg" />
